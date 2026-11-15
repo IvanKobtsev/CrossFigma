@@ -11,8 +11,9 @@
   ],
   "ui": "ui.html",
   "networkAccess": {
+    "reasoning": "Send tokens to the CrossBreeze IDE plugin's import server on your computer.",
     "allowedDomains": [
-      "none"
+      "http://127.0.0.1:38473"
     ]
   }
 }

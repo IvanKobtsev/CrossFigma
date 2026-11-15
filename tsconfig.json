@@ -1,11 +1,1 @@
-{
-  "compilerOptions": {
-    "target": "es2020",
-    "lib": ["es2020"],
-    "strict": true,
-    "typeRoots": [
-      "./node_modules/@types",
-      "./node_modules/@figma"
-    ]
-  }
-}
+{"compilerOptions":{"target":"es2020","lib":["es2022"],"strict":true,"module":"none","outFile":"code.js","typeRoots":["./node_modules/@types","./node_modules/@figma"]},"files":["tokens.ts","code.ts"]}

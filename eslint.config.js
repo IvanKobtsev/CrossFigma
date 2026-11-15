@@ -10,6 +10,10 @@ module.exports = tseslint.config(
   // tseslint.configs.recommended instead.
   tseslint.configs.recommended,
   {
+    files: ['tokens.ts'],
+    rules: { '@typescript-eslint/no-unused-vars': 'off' },
+  },
+  {
     plugins: {
       '@figma/figma-plugins': figmaPlugin,
     },
@@ -27,6 +31,7 @@ module.exports = tseslint.config(
     },
   },
   {
-    ignores: ['code.js', 'dist', 'eslint.config.js'],
+    ignores: ['code.js', 'dist', 'eslint.config.js', 'tests/**'],
   },
 )
+

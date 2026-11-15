@@ -1,37 +1,38 @@
-// This plugin will open a window to prompt the user to enter a number, and
-// it will then create that many rectangles on the screen.
-
-// This file holds the main code for plugins. Code in this file has access to
-// the *figma document* via the figma global object.
-// You can access browser APIs in the <script> tag inside "ui.html" which has a
-// full browser environment (See https://www.figma.com/plugin-docs/how-plugins-run).
-
-// This shows the HTML page in "ui.html".
-figma.showUI(__html__);
-
-// Calls to "parent.postMessage" from within the HTML page will trigger this
-// callback. The callback will be passed the "pluginMessage" property of the
-// posted message.
-figma.ui.onmessage =  (msg: {type: string, count: number}) => {
-  // One way of distinguishing between different types of messages sent from
-  // your HTML page is to use an object with a "type" property like this.
-  if (msg.type === 'create-shapes') {
-    // This plugin creates rectangles on the screen.
-    const numberOfRectangles = msg.count;
-
-    const nodes: SceneNode[] = [];
-    for (let i = 0; i < numberOfRectangles; i++) {
-      const rect = figma.createRectangle();
-      rect.x = i * 150;
-      rect.fills = [{ type: 'SOLID', color: { r: 1, g: 0.5, b: 0 } }];
-      figma.currentPage.appendChild(rect);
-      nodes.push(rect);
+// tokens.ts is compiled before this entry point by tsconfig.json.
+figma.showUI(__html__, { width: 360, height: 270, themeColors: true });
+let busy = false;
+figma.ui.onmessage = async (msg: { type: string; id: number }) => {
+  if (msg.type !== 'collect' || busy) return;
+  busy = true;
+  try {
+    const [collections, variables, paints, texts, effects, grids] = await Promise.all([
+      figma.variables.getLocalVariableCollectionsAsync(), figma.variables.getLocalVariablesAsync(),
+      figma.getLocalPaintStylesAsync(), figma.getLocalTextStylesAsync(), figma.getLocalEffectStylesAsync(), figma.getLocalGridStylesAsync(),
+    ]);
+    const known = new Set(variables.map(v => v.id));
+    for (let i = 0; i < variables.length; i++) {
+      for (const value of Object.values(variables[i].valuesByMode)) {
+        if (typeof value !== 'object' || !('type' in value) || value.type !== 'VARIABLE_ALIAS' || known.has(value.id)) continue;
+        const v = await figma.variables.getVariableByIdAsync(value.id);
+        if (!v) throw new Error(`Missing dependency ${value.id}`);
+        known.add(v.id); variables.push(v);
+        if (!collections.some(c => c.id === v.variableCollectionId)) {
+          const c = await figma.variables.getVariableCollectionByIdAsync(v.variableCollectionId);
+          if (!c) throw new Error(`Missing collection ${v.variableCollectionId}`);
+          collections.push(c);
+        }
+      }
     }
-    figma.currentPage.selection = nodes;
-    figma.viewport.scrollAndZoomIntoView(nodes);
-  }
-
-  // Make sure to close the plugin when you're done. Otherwise the plugin will
-  // keep running, which shows the cancel button at the bottom of the screen.
-  figma.closePlugin();
+    const styles: StyleData[] = [
+      ...paints.map(s => ({ id: s.id, name: s.name, description: s.description, kind: 'paint', data: { paints: s.paints } })),
+      ...texts.map(s => ({ id: s.id, name: s.name, description: s.description, kind: 'text', data: { fontName: s.fontName, fontSize: s.fontSize, letterSpacing: s.letterSpacing, lineHeight: s.lineHeight, textCase: s.textCase, textDecoration: s.textDecoration, paragraphIndent: s.paragraphIndent, paragraphSpacing: s.paragraphSpacing, boundVariables: s.boundVariables } })),
+      ...effects.map(s => ({ id: s.id, name: s.name, description: s.description, kind: 'effect', data: { effects: s.effects } })),
+      ...grids.map(s => ({ id: s.id, name: s.name, description: s.description, kind: 'grid', data: { layoutGrids: s.layoutGrids } })),
+    ];
+    const result = convertTokens(collections, variables, styles, figma.root.name);
+    figma.ui.postMessage({ type: 'collected', id: msg.id, name: figma.root.name, ...result });
+  } catch (e) {
+    figma.ui.postMessage({ type: 'collection-error', id: msg.id, message: e instanceof Error ? e.message : String(e), details: errorDetails(e) });
+  } finally { busy = false; }
 };
+

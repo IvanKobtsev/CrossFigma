@@ -1,7 +1,7 @@
 {
-  "name": "CrossFigma",
+  "name": "cross-figma",
   "version": "0.1.0",
-  "description": "Your Figma Plugin",
+  "description": "A Figma plugin that works alongside XCSS CLI and exports design tokens in DTCG format",
   "main": "code.js",
   "scripts": {
     "build": "tsc -p tsconfig.json",
@@ -9,7 +9,7 @@
     "lint:fix": "eslint . --fix",
     "watch": "npm run build -- --watch"
   },
-  "author": "",
+  "author": "IvanKobtsev",
   "license": "",
   "devDependencies": {
     "@eslint/js": "^9.39.4",

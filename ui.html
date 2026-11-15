@@ -1,17 +1,76 @@
-<h2>Rectangle Creator</h2>
-<p>Count: <input id="count" type="number" value="5"></p>
-<button id="create">Create</button>
-<button id="cancel">Cancel</button>
+<!doctype html>
+<html lang="en"><title>CrossFigma</title><head><meta charset="utf-8"><style>
+body{margin:0;padding:20px;font:12px Inter,system-ui,sans-serif;background:var(--figma-color-bg,#fff);color:var(--figma-color-text,#222)}button{width:100%;padding:11px 8px;border:1px solid var(--figma-color-border,#ddd);border-radius:6px;background:var(--figma-color-bg,#fff);color:inherit;font:inherit;cursor:pointer;margin-bottom:10px}button.primary{background:var(--figma-color-bg-brand,#1769e0);color:var(--figma-color-text-onbrand,#fff);border-color:transparent}button:disabled{opacity:.5;cursor:wait}#status{white-space:pre-wrap;overflow-wrap:anywhere;margin:5px 0;max-height:90px;overflow:auto}#copy{width:auto;padding:5px 9px}textarea{width:100%;box-sizing:border-box;height:90px;color:inherit;background:inherit} [hidden]{display:none!important}
+</style></head><body>
+<button class="primary" id="send">Send design tokens to CrossBreeze</button>
+<button id="export">Export design tokens as JSON</button>
+<div id="status" role="status" aria-live="polite"></div>
+<button id="copy" hidden>Copy error details</button><textarea id="details" readonly hidden aria-label="Error details"></textarea>
 <script>
-
-document.getElementById('create').onclick = () => {
-  const textbox = document.getElementById('count');
-  const count = parseInt(textbox.value, 10);
-  parent.postMessage({ pluginMessage: { type: 'create-shapes', count } }, '*')
+const base = 'http://127.0.0.1:38473';
+const send = document.getElementById('send'), exp = document.getElementById('export'), status = document.getElementById('status'), copy = document.getElementById('copy'), details = document.getElementById('details');
+let busy = false, sequence = 0, pending, fullError = '';
+function diagnostic(e, seen = new Set()) { if (seen.has(e)) return '[Circular cause]'; seen.add(e); return e instanceof Error ? (e.stack || e.message) + (e.cause ? '\nCaused by: ' + diagnostic(e.cause, seen) : '') : String(e); }
+async function request(path, options, timeout) {
+  const controller = new AbortController(), timer = setTimeout(() => controller.abort(new Error(`Request timed out after ${timeout} ms`)), timeout);
+  try {
+    const response = await fetch(base + path, { ...options, signal: controller.signal });
+    const body = await response.text();
+    if (!response.ok) throw new Error(`${options.method} ${path}: HTTP ${response.status} ${response.statusText}\n${body}`);
+    return { response, body };
+  } finally { clearTimeout(timer); }
 }
-
-document.getElementById('cancel').onclick = () => {
-  parent.postMessage({ pluginMessage: { type: 'cancel' } }, '*')
+function collect() {
+  return new Promise((resolve, reject) => {
+    const id = ++sequence;
+    const timer = setTimeout(() => { pending = undefined; reject(new Error('Figma token collection timed out after 60 seconds')); }, 60000);
+    pending = { id, resolve, reject, timer };
+    parent.postMessage({ pluginMessage: { type: 'collect', id } }, '*');
+  });
 }
-
-</script>
+window.onmessage = event => {
+  if (event.source !== parent) return;
+  const msg = event.data.pluginMessage;
+  if (!msg || !pending || msg.id !== pending.id) return;
+  const p = pending;
+  if (msg.type !== 'collected' && msg.type !== 'collection-error') return;
+  pending = undefined; clearTimeout(p.timer);
+  if (msg.type === 'collection-error') { const e = new Error(msg.message); e.stack = msg.details; p.reject(e); }
+  else p.resolve(msg);
+};
+async function run(action) {
+  if (busy) return;
+  busy = true; send.disabled = exp.disabled = true; copy.hidden = details.hidden = true; fullError = '';
+  let stage = action === 'send' ? 'Health check' : 'Token conversion';
+  try {
+    if (action === 'send') {
+      status.textContent = 'Checking CrossBreeze…';
+      const { response, body } = await request('/health', { method: 'GET' }, 3000);
+      const health = JSON.parse(body);
+      if (response.status !== 200 || health.service !== 'CrossBreeze' || health.protocolVersion !== 1) throw new Error('CrossBreeze health identity or protocol version does not match');
+    }
+    stage = 'Token conversion'; status.textContent = 'Reading and transforming design tokens…';
+    const result = await collect();
+    const json = JSON.stringify(result.document, null, 2) + '\n';
+    if (action === 'send') {
+      stage = 'Token transfer'; status.textContent = 'Sending design tokens…';
+      await request('/design-tokens', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: json }, 30000);
+    } else {
+      stage = 'JSON download';
+      const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+      const link = document.createElement('a'); link.href = url; link.download = (result.name.replace(/[<>:"/\\|?*\x00-\x1f]/g, '-').replace(/[. ]+$/g, '') || 'design-tokens') + '.resolver.json';
+      document.body.appendChild(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+    status.textContent = (action === 'send' ? 'Design tokens sent to CrossBreeze.' : 'Design tokens exported.') + (result.warnings.length ? '\n' + result.warnings.join('\n') : '');
+  } catch (e) {
+    fullError = stage + '\n' + diagnostic(e);
+    status.textContent = stage === 'Health check' ? 'Please make sure the import process has been started in CrossBreeze.' : e.message || String(e);
+    copy.hidden = false;
+  } finally { busy = false; send.disabled = exp.disabled = false; }
+}
+send.onclick = () => run('send'); exp.onclick = () => run('export');
+copy.onclick = async () => {
+  try { await navigator.clipboard.writeText(fullError); copy.textContent = 'Copied'; setTimeout(() => copy.textContent = 'Copy error details', 1500); }
+  catch { details.hidden = false; details.value = fullError; details.focus(); details.select(); }
+};
+</script></body></html>
