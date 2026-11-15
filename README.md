@@ -20,7 +20,7 @@ Specifications: https://www.designtokens.org/tr/2025.10/format/ and https://www.
 
 ## CrossBreeze server contract (server not implemented here)
 
-Bind `127.0.0.1:38473` while the IDE import process is active.
+Bind `localhost:38473` while the IDE import process is active.
 
 - `GET /health`: HTTP 200, JSON `{ "service": "CrossBreeze", "protocolVersion": 1 }`.
 - `POST /design-tokens`: receives the resolver document directly as `application/json`. Return any 2xx status only when accepted. For failures return non-2xx with useful diagnostic text.
@@ -31,3 +31,4 @@ CrossFigma checks health before reading tokens. Health requests time out after t
 ## Manual acceptance checks
 
 In both Figma desktop and browser: export a multi-mode fixture, confirm a downloaded JSON file, test successful transfer with a compatible server, stop the server and confirm the health warning, return a POST error and confirm diagnostic copying, deny clipboard access and confirm selectable fallback, test both Figma themes and rapid repeated clicks. Live Figma/browser checks require an interactive Figma session and are not covered by the automated fixtures.
+

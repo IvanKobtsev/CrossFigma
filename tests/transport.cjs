@@ -2,6 +2,8 @@ const { readFileSync } = require('node:fs');
 const vm = require('node:vm');
 const assert = require('node:assert/strict');
 const script = readFileSync('ui.html', 'utf8').match(/<script>([\s\S]*?)<\/script>/)[1];
+const manifest = JSON.parse(readFileSync('manifest.json', 'utf8'));
+assert.deepEqual(manifest.networkAccess.allowedDomains, ['http://localhost:38473']);
 async function scenario(responses) {
   const elements = new Map();
   const calls = [];
@@ -32,6 +34,8 @@ async function scenario(responses) {
   assert.equal(result.collected, 0);
   result = await scenario([health, { status: 204, body: '' }]);
   assert.equal(result.collected, 1); assert.equal(result.calls.length, 2); assert.match(result.status, /sent/);
+  assert.equal(result.calls[0].url, 'http://localhost:38473/health');
+  assert.equal(result.calls[1].url, 'http://localhost:38473/design-tokens');
   assert.equal(result.calls[1].options.headers['Content-Type'], 'application/json');
   result = await scenario([health, { status: 500, body: 'Importer failed' }]);
   assert.match(result.status, /500.*\nImporter failed/); assert.equal(result.copy.hidden, false); assert.equal(result.calls.length, 2);

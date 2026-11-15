@@ -13,7 +13,8 @@
   "networkAccess": {
     "reasoning": "Send tokens to the CrossBreeze IDE plugin's import server on your computer.",
     "allowedDomains": [
-      "http://127.0.0.1:38473"
+      "http://localhost:38473"
     ]
   }
 }
+

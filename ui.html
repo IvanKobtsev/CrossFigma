@@ -7,7 +7,7 @@ body{margin:0;padding:20px;font:12px Inter,system-ui,sans-serif;background:var(-
 <div id="status" role="status" aria-live="polite"></div>
 <button id="copy" hidden>Copy error details</button><textarea id="details" readonly hidden aria-label="Error details"></textarea>
 <script>
-const base = 'http://127.0.0.1:38473';
+const base = 'http://localhost:38473';
 const send = document.getElementById('send'), exp = document.getElementById('export'), status = document.getElementById('status'), copy = document.getElementById('copy'), details = document.getElementById('details');
 let busy = false, sequence = 0, pending, fullError = '';
 function diagnostic(e, seen = new Set()) { if (seen.has(e)) return '[Circular cause]'; seen.add(e); return e instanceof Error ? (e.stack || e.message) + (e.cause ? '\nCaused by: ' + diagnostic(e.cause, seen) : '') : String(e); }
@@ -74,3 +74,4 @@ copy.onclick = async () => {
   catch { details.hidden = false; details.value = fullError; details.focus(); details.select(); }
 };
 </script></body></html>
+
